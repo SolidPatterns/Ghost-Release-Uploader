@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using ImpromptuInterface.Dynamic;
 
 namespace GhostVersionFunctionApp
 {
@@ -36,12 +37,48 @@ namespace GhostVersionFunctionApp
         public static void EnrichPackageJson(this DirectoryInfo target)
         {
             var packageJsonLocation = Path.Combine(target.FullName, "package.json");
-            string json = File.ReadAllText(packageJsonLocation);
-            dynamic jsonObj = Newtonsoft.Json.JsonConvert.DeserializeObject(json);
+            var jsonObj = FileToJson(packageJsonLocation);
+            
             //jsonObj.engines.node = ((string)jsonObj.engines.node).Split(new[] { "||" }, StringSplitOptions.None).LastOrDefault().Trim();
             jsonObj.dependencies.applicationinsights = "^1.0.0";
+            SaveJsonToFile(jsonObj, packageJsonLocation);
+        }
+
+        public static void InjectConfigSecrets(this DirectoryInfo target, Settings settings)
+        {
+            if (!settings.InjectConfigSecrets)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.FunctionEnvironment))
+            {
+                return;
+            }
+            
+            var configJsonLocation = Path.Combine(target.FullName, $"config.{settings.FunctionEnvironment}.json");
+            InjectConfigSecrets(configJsonLocation, settings);
+        }
+
+        private static void InjectConfigSecrets(string configLocation, Settings settings)
+        {
+            var config = FileToJson(configLocation);
+            config.database.connection.host = settings.DbHost;
+            config.database.connection.user = settings.DbUser;
+            config.database.connection.password = settings.DbPassword;
+            SaveJsonToFile(config, configLocation);
+        }
+
+        private static void SaveJsonToFile(dynamic jsonObj, string jsonFileLocation)
+        {
             string output = Newtonsoft.Json.JsonConvert.SerializeObject(jsonObj, Newtonsoft.Json.Formatting.Indented);
-            File.WriteAllText(packageJsonLocation, output);
+            File.WriteAllText(jsonFileLocation, output);
+        }
+
+        private static dynamic FileToJson(string jsonFileLocation)
+        {
+            var json = File.ReadAllText(jsonFileLocation);
+            return Newtonsoft.Json.JsonConvert.DeserializeObject(json);
         }
 
         public static async Task DownloadGhostVersion(this DirectoryInfo destination, string releaseUrl)

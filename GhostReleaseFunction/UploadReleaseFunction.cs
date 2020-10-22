@@ -196,6 +196,11 @@ namespace GhostVersionFunctionApp
                     repoDir.EnrichPackageJson();
 
                     var azureResourcesDir = new DirectoryInfo(Path.Combine(resourcesPath, "AzureDeployment"));
+                    
+                    //todo: enrich config.production.json to inject the right db credentials from environment variables before copying.
+                    //todo: update azuredeploy.json with arm templates of new resources like mysql and key vault.
+                    repoDir.InjectConfigSecrets(Settings);
+                    
                     azureResourcesDir.CopyFilesRecursively(repoDir);
 
                     Commands.Stage(repo, "*");
